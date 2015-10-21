@@ -5,6 +5,7 @@
         "pgsql"  : "psql",
         "oracle" : "sqlplus",
         "vertica": "vsql",
+        "sqlite": "sqlite3",
     },
     "connections": {
     },
