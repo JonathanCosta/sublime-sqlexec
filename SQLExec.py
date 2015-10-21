@@ -5,6 +5,7 @@ import sublime_plugin
 import subprocess
 import tempfile
 from datetime import datetime
+from string import Template
 
 connection = None
 history = ['']
@@ -13,6 +14,7 @@ sqlexec_settings = sublime.load_settings("SQLExec.sublime-settings")
 
 class Connection:
     def __init__(self, options):
+        self.query = ''
         self.db_type = options.type
         self.name = '{}: {}@{}'.format(options.type, options.username, options.host)
         self.settings = sublime.load_settings(options.type + ".sqlexec").get('sql_exec')
@@ -70,32 +72,32 @@ class Connection:
 
 
 class Command:
+
     def __init__(self, text):
         self.text = text
+        self.template = Template('$dbinfo    $qtime\nSQL> $query\n\n$result')
         self.show_result_on_window = sqlexec_settings.get('show_result_on_window')
 
-    def _display(self, panelName, text):
-        panel = self.get_panel(panelName)
+    def _display(self, panel_name, text):
+        panel = self.get_panel(panel_name)
         panel.set_read_only(False)
         panel.set_syntax_file(sqlexec_settings.get('syntax'))
-        panel.run_command('append', {'characters': text})
+        panel.run_command('append', {'characters': self.fill_template(connection.name, connection.query, text)})
         panel.set_read_only(sqlexec_settings.get('read_only_results'))
-
-    def _result(self, text):
-        text = text.split('\n')
-        text.insert(0, '')
-        if connection.query:
-            text.insert(0, 'SQL> {}'.format(re.sub(r'\s+', ' ', connection.query.replace('\n', ' '))).strip())
-        text.insert(0, '{}    {}'.format(connection.name, datetime.now()))
-        self._display('SQLExec', '\n'.join(text))
 
     def _errors(self, text):
         self._display('SQLExec.errors', text)
 
+    def fill_template(self, connection_name, query, result):
+        return self.template.substitute(dbinfo=connection_name, qtime=datetime.now(),
+                                        query=re.sub(r'\s+', ' ', query.replace('\n', ' ')),
+                                        result=result)
+
     def get_panel(self, panel_name=None):
         if self.show_result_on_window:
             panel = sublime.active_window().new_file()
-            panel.set_name("Query Results")
+            if panel_name:
+                panel.set_name(panel_name)
             panel.set_scratch(True)
             return panel
         panel = sublime.active_window().create_output_panel(panel_name)
@@ -113,9 +115,8 @@ class Command:
 
     def show(self):
         results = self.run()
-
         if results:
-            self._result(results)
+            self._display("SQLExec Results", results)
 
 
 class Selection:
