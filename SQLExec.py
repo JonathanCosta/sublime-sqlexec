@@ -1,4 +1,10 @@
-import sublime, sublime_plugin, tempfile, os, subprocess
+import os
+import re
+import sublime
+import sublime_plugin
+import subprocess
+import tempfile
+from datetime import datetime
 
 connection = None
 history = ['']
@@ -7,6 +13,8 @@ sqlexec_settings = sublime.load_settings("SQLExec.sublime-settings")
 
 class Connection:
     def __init__(self, options):
+        self.db_type = options.type
+        self.name = '{}: {}@{}'.format(options.type, options.username, options.host)
         self.settings = sublime.load_settings(options.type + ".sqlexec").get('sql_exec')
         self.command = sqlexec_settings.get('sql_exec.commands')[options.type]
         self.options = options
@@ -33,8 +41,8 @@ class Connection:
         os.unlink(self.tmp.name)
 
     def desc(self):
-        query = self.settings['queries']['desc']['query']
-        command = self._getCommand(self.settings['queries']['desc']['options'], query)
+        self.query = self.settings['queries']['desc']['query']
+        command = self._getCommand(self.settings['queries']['desc']['options'], self.query)
 
         tables = []
         for result in command.run().splitlines():
@@ -44,19 +52,18 @@ class Connection:
                 pass
 
         os.unlink(self.tmp.name)
-
         return tables
 
     def descTable(self, tableName):
-        query = self.settings['queries']['desc table']['query'] % tableName
-        command = self._getCommand(self.settings['queries']['desc table']['options'], query)
+        self.query = self.settings['queries']['desc table']['query'] % tableName
+        command = self._getCommand(self.settings['queries']['desc table']['options'], self.query)
         command.show()
 
         os.unlink(self.tmp.name)
 
     def showTableRecords(self, tableName):
-        query = self.settings['queries']['show records']['query'] % tableName
-        command = self._getCommand(self.settings['queries']['show records']['options'], query)
+        self.query = self.settings['queries']['show records']['query'] % tableName
+        command = self._getCommand(self.settings['queries']['show records']['options'], self.query)
         command.show()
 
         os.unlink(self.tmp.name)
@@ -75,7 +82,12 @@ class Command:
         panel.set_read_only(sqlexec_settings.get('read_only_results'))
 
     def _result(self, text):
-        self._display('SQLExec', text)
+        text = text.split('\n')
+        text.insert(0, '')
+        if connection.query:
+            text.insert(0, 'SQL> {}'.format(re.sub(r'\s+', ' ', connection.query.replace('\n', ' '))).strip())
+        text.insert(0, '{}    {}'.format(connection.name, datetime.now()))
+        self._display('SQLExec', '\n'.join(text))
 
     def _errors(self, text):
         self._display('SQLExec.errors', text)
