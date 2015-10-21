@@ -8,5 +8,6 @@
     },
     "connections": {
     },
-    "syntax": "Packages/SQL/SQL.tmLanguage"
+    "syntax": "Packages/SQL/SQL.tmLanguage",
+    "read_only_results": true
 }

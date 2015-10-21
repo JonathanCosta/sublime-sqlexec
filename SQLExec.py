@@ -72,7 +72,7 @@ class Command:
         panel.set_read_only(False)
         panel.set_syntax_file(sqlexec_settings.get('syntax'))
         panel.run_command('append', {'characters': text})
-        panel.set_read_only(True)
+        panel.set_read_only(sqlexec_settings.get('read_only_results'))
 
     def _result(self, text):
         self._display('SQLExec', text)
