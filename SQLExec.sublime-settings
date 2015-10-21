@@ -8,6 +8,7 @@
     },
     "connections": {
     },
-    "syntax": "Packages/SQL/SQL.tmLanguage",
+    "syntax": "Packages/SQLExec/SQLExecResults.tmLanguage",
+    "color_scheme": "Packages/SQLExec/SQLExecResults.tmTheme",
     "read_only_results": true
 }

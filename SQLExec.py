@@ -82,6 +82,11 @@ class Command:
         panel = self.get_panel(panel_name)
         panel.set_read_only(False)
         panel.set_syntax_file(sqlexec_settings.get('syntax'))
+
+        # if len(sqlexec_settings.get('color_scheme')):
+        panel.settings().add_on_change('color_scheme', sqlexec_settings.get('color_scheme'))
+        panel.settings().set('color_scheme', sqlexec_settings.get('color_scheme'))
+
         panel.run_command('append', {'characters': self.fill_template(connection.name, connection.query, text)})
         panel.set_read_only(sqlexec_settings.get('read_only_results'))
 

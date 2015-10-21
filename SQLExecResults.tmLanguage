@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>fileTypes</key>
+	<array>
+		<string>sqlexec</string>
+	</array>
+	<key>name</key>
+	<string>SQLExec Results</string>
+	<key>patterns</key>
+	<array>
+		<dict>
+			<key>comment</key>
+			<string>The table border uses hyphens and pipes</string>
+			<key>match</key>
+			<string>\-+|\|</string>
+			<key>name</key>
+			<string>SQLExecResults.table.border</string>
+		</dict>
+		<!-- <dict>
+			<key>comment</key>
+			<string>The Data</string>
+			<key>match</key>
+			<string>(.*)\s\|\s</string>
+			<key>name</key>
+			<string>SQLExecResults.table.data</string>
+		</dict> -->
+		<dict>
+			<key>captures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>prompt</string>
+				</dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>statement</string>
+				</dict>
+			</dict>
+			<key>comment</key>
+			<string>The SQL prompt</string>
+			<key>match</key>
+			<string>^(SQL\&gt;)\s*(.+)$</string>
+			<key>name</key>
+			<string>SQLExecResults.sql.command</string>
+		</dict>
+	</array>
+	<key>scopeName</key>
+	<string>text.SQLExecResults</string>
+	<key>uuid</key>
+	<string>1fe9903f-5d65-4b94-bec4-6129ef2b6bdb</string>
+</dict>
+</plist>
