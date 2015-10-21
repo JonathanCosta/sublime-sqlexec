@@ -8,24 +8,24 @@ sqlexec_settings = sublime.load_settings("SQLExec.sublime-settings")
 class Connection:
     def __init__(self, options):
         self.settings = sublime.load_settings(options.type + ".sqlexec").get('sql_exec')
-        self.command  = sqlexec_settings.get('sql_exec.commands')[options.type]
-        self.options  = options
+        self.command = sqlexec_settings.get('sql_exec.commands')[options.type]
+        self.options = options
 
     def _buildCommand(self, options):
         return self.command + ' ' + ' '.join(options) + ' ' + self.settings['args'].format(options=self.options)
 
-    def _getCommand(self, options, queries, header = ''):
-        command  = self._buildCommand(options)
-        self.tmp = tempfile.NamedTemporaryFile(mode = 'w', delete = False, suffix='.sql')
-        for query in self.settings['before']:
-            self.tmp.write(query + "\n")
-        for query in queries:
-            self.tmp.write(query)
+    def _getCommand(self, options, queries, header=''):
+        if not isinstance(queries, list):
+            queries = [queries]
+        self.write_query_file(self.settings['before'] + queries)
+
+        command = self._buildCommand(options)
+        return Command('%s < "%s"' % (command, self.tmp.name))
+
+    def write_query_file(self, query_list):
+        self.tmp = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.sql')
+        self.tmp.write("\n".join(query_list))
         self.tmp.close()
-
-        cmd = '%s < "%s"' % (command, self.tmp.name)
-
-        return Command(cmd)
 
     def execute(self, queries):
         command = self._getCommand(self.settings['options'], queries)
@@ -92,7 +92,7 @@ class Command:
 
     def run(self):
         sublime.status_message(' SQLExec: running SQL command')
-        results, errors = subprocess.Popen(self.text, stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True).communicate()
+        results, errors = subprocess.Popen(self.text, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True).communicate()
 
         if not results and errors:
             self._errors(errors.decode('utf-8', 'replace').replace('\r', ''))
