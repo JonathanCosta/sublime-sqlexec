@@ -7,5 +7,6 @@
         "vertica": "vsql",
     },
     "connections": {
-    }
+    },
+    "syntax": "Packages/SQL/SQL.tmLanguage"
 }
