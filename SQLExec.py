@@ -23,7 +23,7 @@ class Connection:
 
         cmd = '%s < "%s"' % (command, self.tmp.name)
 
-        return Command(cmd)
+        return Command(cmd, options.encoding)
 
     def execute(self, queries):
         command = self._getCommand(self.settings['options'], queries)
@@ -60,8 +60,9 @@ class Connection:
         os.unlink(self.tmp.name)
 
 class Command:
-    def __init__(self, text):
+    def __init__(self, text, encoding = None):
         self.text = text
+        self.encoding = encoding
 
     def _display(self, panelName, text):
         if not sublime.load_settings("SQLExec.sublime-settings").get('show_result_on_window'):
@@ -84,11 +85,11 @@ class Command:
     def run(self):
         sublime.status_message(' SQLExec: running SQL command')
         results, errors = subprocess.Popen(self.text, stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True).communicate()
-
+        encoding = 'utf-8' if self.encoding is None else self.encoding
         if not results and errors:
-            self._errors(errors.decode('utf-8', 'replace').replace('\r', ''))
+            self._errors(errors.decode(encoding, 'replace').replace('\r', ''))
 
-        return results.decode('utf-8', 'replace').replace('\r', '')
+        return results.decode(encoding, 'replace').replace('\r', '')
 
     def show(self):
         results = self.run()
@@ -119,6 +120,7 @@ class Options:
         self.username = connections[self.name]['username']
         self.password = connections[self.name]['password']
         self.database = connections[self.name]['database']
+        self.encoding = connections[self.name].get('encoding')
         if 'service' in connections[self.name]:
             self.service  = connections[self.name]['service']
 
