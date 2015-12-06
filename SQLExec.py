@@ -23,7 +23,7 @@ class Connection:
 
         cmd = '%s < "%s"' % (command, self.tmp.name)
 
-        return Command(cmd, options.encoding)
+        return Command(cmd, self.options.encoding)
 
     def execute(self, queries):
         command = self._getCommand(self.settings['options'], queries)
