@@ -19,8 +19,20 @@
     "caption": "SQLExec: Show Table Records",
     "command": "sql_show_records"
   },
+    {
+    "caption": "SQLExec: Show Recent Table Records",
+    "command": "sql_show_recent_records"
+  },
   {
     "caption": "SQLExec: Desc Table",
     "command": "sql_desc"
+  },
+  {
+    "caption": "SQLExec: Desc Functions",
+    "command": "sql_desc_func"
+  },
+  {
+    "caption": "SQLExec: Find Column in Tables",
+    "command": "sql_column"
   }
 ]

@@ -1,0 +1,1 @@
+{"url": "http://lubriciousdevelopers.github.io/projects/sublime-sql-exec", "platforms": ["*"], "sublime_text": ">=3000", "version": "2015.04.01.09.06.10", "description": "A Plugin for running SQL commands in Sublime Text", "dependencies": []}
