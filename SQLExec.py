@@ -47,7 +47,11 @@ class Connection:
         command = self._getCommand(self.settings['queries']['desc']['options'], self.query)
 
         tables = []
-        for result in command.run().splitlines():
+        results = command.run().splitlines()
+        if self.db_type == 'sqlite':
+            results = ' '.join(results)
+            results = results.split()
+        for result in results:
             if result and '|' in result:
                 try:
                     tables.append(result.split('|')[1].strip())
@@ -164,7 +168,10 @@ class Options:
 
     @staticmethod
     def list():
-        return sorted([conn for conn in sqlexec_settings.get('connections')])
+        try:
+            return sorted([conn for conn in sqlexec_settings.get('connections')])
+        except:
+            return []
 
 
 class SQLite(object):
