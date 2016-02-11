@@ -108,7 +108,7 @@ class Command:
             panel = sublime.active_window().new_file()
 
         panel.set_read_only(False)
-        panel.set_syntax_file('Packages/SQL/SQL.tmLanguage')
+        panel.set_syntax_file('Packages/SQL/SQL.sublime-syntax')
         panel.run_command('append', {'characters': text})
         panel.set_read_only(True)
 
