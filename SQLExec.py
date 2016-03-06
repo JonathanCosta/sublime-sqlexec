@@ -272,9 +272,12 @@ class SQLite(object):
 def sqlChangeConnection(index):
     global connection
     names = Options.list()
-    options = Options(names[index])
-    connection = Connection(options)
-    sublime.status_message(' SQLExec: switched to %s' % names[index])
+    try:
+        options = Options(names[index])
+        connection = Connection(options)
+        sublime.status_message(' SQLExec: switched to %s' % names[index])
+    except IndexError:
+        sublime.status_message(' SQLExec Error: %s is not configured in SQLExec settings' % names[index])
 
 
 def showTableRecords(index):
