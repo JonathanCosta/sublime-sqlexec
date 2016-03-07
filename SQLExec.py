@@ -277,7 +277,7 @@ def sqlChangeConnection(index):
         connection = Connection(options)
         sublime.status_message(' SQLExec: switched to %s' % names[index])
     except IndexError:
-        sublime.status_message(' SQLExec Error: %s is not configured in SQLExec settings' % names[index])
+        sublime.status_message(' SQLExec Error: %s is not configured in SQLExec settings' % index)
 
 
 def showTableRecords(index):
