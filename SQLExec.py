@@ -357,4 +357,7 @@ class sqlExecute(sublime_plugin.WindowCommand):
 
 class sqlListConnection(sublime_plugin.WindowCommand):
     def run(self):
-        sublime.active_window().show_quick_panel(Options.list(), sqlChangeConnection)
+        try:
+            sublime.active_window().show_quick_panel(Options.list(), sqlChangeConnection)
+        except Exception as e:
+            return sublime.error_message('FAILED: {}'.format(repr(e)))
