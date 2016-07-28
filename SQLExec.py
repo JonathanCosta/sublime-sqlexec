@@ -224,6 +224,11 @@ def executeHistoryQuery(index):
     if index > -1:
         executeQuery(history[index])
 
+def executeEditHistoryQuery(index):
+    global history
+    if index > -1:
+        sublime.active_window().show_input_panel('Enter query', history[index], executeQuery, None, None)
+
 def executeQuery(query):
     global connection
     global history
@@ -236,6 +241,11 @@ class sqlHistory(sublime_plugin.WindowCommand):
     global history
     def run(self):
         sublime.active_window().show_quick_panel(history, executeHistoryQuery)
+
+class sqlEditHistory(sublime_plugin.WindowCommand):
+    global history
+    def run(self):
+        sublime.active_window().show_quick_panel(history, executeEditHistoryQuery)
 
 class sqlDesc(sublime_plugin.WindowCommand):
     def run(self):

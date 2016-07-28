@@ -12,6 +12,10 @@
     "command": "sql_history"
   },
   {
+    "caption": "SQLExec: History (edit selection)",
+    "command": "sql_edit_history"
+  },
+  {
     "caption": "SQLExec: Type Query",
     "command": "sql_query"
   },
