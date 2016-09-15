@@ -10,7 +10,7 @@ class Connection:
         self.options  = options
 
     def _buildCommand(self, options):
-        return self.command + ' ' + ' '.join(options) + ' ' + self.settings['args'].format(options=self.options)
+        return self.command + ' ' + self.settings['args'].format(options=self.options) + ' ' + ' '.join(options)
 
     def _getCommand(self, options, queries, header = ''):
         command  = self._buildCommand(options)
@@ -67,6 +67,19 @@ class Connection:
 
         return tables
 
+    def columnList(self):
+        query = self.settings['queries']['column list']['query']
+        command = self._getCommand(self.settings['queries']['column list']['options'], query)
+
+        columns = []
+        for result in command.run().splitlines():
+            if result.strip():
+                columns.append(result.strip())
+
+        os.unlink(self.tmp.name)
+
+        return columns
+
     def descFunc(self, tableName):
         query = self.settings['queries']['desc func']['query'] % tableName
         command = self._getCommand(self.settings['queries']['desc func']['options'], query)
@@ -74,10 +87,9 @@ class Connection:
 
         os.unlink(self.tmp.name)
 
-    def column(self, columnName):
-        query = self.settings['queries']['column']['query'] % columnName
-        print('test3')
-        command = self._getCommand(self.settings['queries']['column']['options'], query)
+    def descColumn(self, columnName):
+        query = self.settings['queries']['desc column']['query'] % columnName
+        command = self._getCommand(self.settings['queries']['desc column']['options'], query)
         command.show()
 
         os.unlink(self.tmp.name)
@@ -107,6 +119,7 @@ class Command:
         else:
             panel = sublime.active_window().new_file()
 
+        panel.settings().set("word_wrap", "false")
         panel.set_read_only(False)
         panel.set_syntax_file('Packages/SQL/SQL.sublime-syntax')
         panel.run_command('append', {'characters': text})
@@ -120,7 +133,7 @@ class Command:
 
     def run(self):
         sublime.status_message(' SQLExec: running SQL command')
-        results, errors = subprocess.Popen(self.text, stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True).communicate()
+        results, errors = subprocess.Popen(self.text, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True).communicate()
 
         if not results and errors:
             self._errors(errors.decode('utf-8', 'replace').replace('\r', ''))
@@ -158,6 +171,7 @@ class Options:
         self.database = connections[self.name]['database']
         if 'service' in connections[self.name]:
             self.service  = connections[self.name]['service']
+        self.is_default = connections[self.name].get('is_default', False)
 
     def __str__(self):
         return self.name
@@ -214,10 +228,14 @@ def descFunc(index):
         else:
             sublime.error_message('No active connection')
 
-def column(query):
+def showColumns(index):
     global connection
-    if connection is not None:
-        connection.column(query)
+    if index > -1:
+        if connection is not None:
+            columns = connection.columnList()
+            connection.descColumn(columns[index])
+        else:
+            sublime.error_message('No active connection')
 
 def executeHistoryQuery(index):
     global history
@@ -296,7 +314,8 @@ class sqlColumn(sublime_plugin.WindowCommand):
     def run(self):
         global connection
         if connection is not None:
-            sublime.active_window().show_input_panel('Enter column', '', column, None, None)
+            columns = connection.columnList()
+            sublime.active_window().show_quick_panel(columns, showColumns)
         else:
             sublime.error_message('No active connection')
 
@@ -312,3 +331,12 @@ class sqlExecute(sublime_plugin.WindowCommand):
 class sqlListConnection(sublime_plugin.WindowCommand):
     def run(self):
         sublime.active_window().show_quick_panel(Options.list(), sqlChangeConnection)
+
+def defaultConnection():
+    global connection
+    name, default_options = next(((name, Options(name)) for name in Options.list() if Options(name).is_default), (None, None))
+    if default_options:
+        connection = Connection(default_options)
+        sublime.status_message(' SQLExec: switched to %s' % name)
+
+sublime.set_timeout_async(defaultConnection, 500)
