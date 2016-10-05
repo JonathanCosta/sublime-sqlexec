@@ -95,7 +95,7 @@ class Connection:
         os.unlink(self.tmp.name)
 
     def showRecentTableRecords(self, tableName):
-        query = self.settings['queries']['show recent records']['query'] % (tableName, tableName)
+        query = self.settings['queries']['show recent records']['query'] % (tableName, tableName.split('.')[-1])
         command = self._getCommand(self.settings['queries']['show recent records']['options'], query)
         command.show()
 
