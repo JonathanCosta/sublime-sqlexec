@@ -40,7 +40,7 @@
                 "format" : "|%s|"
             },
             "desc column": {
-                "query": "SELECT * FROM INFORMATION_SCHEMA.columns WHERE column_name = '%s';",
+                "query": "SELECT * FROM INFORMATION_SCHEMA.columns WHERE column_name = '%s' ORDER BY table_schema, table_name;",
                 "options": ["-P null=\"<NULL>\""],
                 "format" : "|%s|"
             }
