@@ -1,6 +1,7 @@
 import sublime, sublime_plugin, tempfile, os, subprocess
 
 connection = None
+active_connection = None
 history = ['']
 
 class Connection:
@@ -135,11 +136,14 @@ class Options:
         return names
 
 def sqlChangeConnection(index):
-    global connection
+    global connection, active_connection
     names = Options.list()
     options = Options(names[index])
+    active_connection = options
     connection = Connection(options)
     sublime.status_message(' SQLExec: switched to %s' % names[index])
+    sublime.active_window().active_view().run_command('sql_show_active_connection')
+
 
 def showTableRecords(index):
     global connection
@@ -216,3 +220,16 @@ class sqlExecute(sublime_plugin.WindowCommand):
 class sqlListConnection(sublime_plugin.WindowCommand):
     def run(self):
         sublime.active_window().show_quick_panel(Options.list(), sqlChangeConnection)
+
+class sqlExecListener(sublime_plugin.EventListener):
+    def on_activated(self, view):
+        view.run_command('sql_show_active_connection')
+
+class sqlShowActiveConnection(sublime_plugin.TextCommand):
+    def run(self, view):
+        self.status_bar()
+
+    def status_bar(self):
+        global active_connection
+        message = 'SQLExec conn : %s ' % active_connection
+        sublime.active_window().active_view().set_status('sqlexec', message)
