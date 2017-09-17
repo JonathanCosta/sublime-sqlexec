@@ -1,6 +1,7 @@
 [
     { "keys": ["ctrl+alt+e"], "command": "sql_list_connection" },
     { "keys": ["ctrl+e", "ctrl+e"], "command": "sql_execute" },
+    { "keys": ["ctrl+shift+e", "ctrl+shift+e"], "command": "sql_export" },
     { "keys": ["ctrl+e", "ctrl+h"], "command": "sql_history" },
     { "keys": ["ctrl+e", "ctrl+q"], "command": "sql_query" },
     { "keys": ["ctrl+e", "ctrl+s"], "command": "sql_show_records" },

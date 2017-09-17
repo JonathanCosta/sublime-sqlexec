@@ -1,4 +1,4 @@
-import sublime, sublime_plugin, tempfile, os, subprocess
+import sublime, sublime_plugin, tempfile, os, subprocess, re
 
 connection = None
 history = ['']
@@ -25,9 +25,9 @@ class Connection:
 
         return Command(cmd)
 
-    def execute(self, queries):
+    def execute(self, queries, export = False):
         command = self._getCommand(self.settings['options'], queries)
-        command.show()
+        command.show(export)
         os.unlink(self.tmp.name)
 
     def desc(self):
@@ -63,8 +63,19 @@ class Command:
     def __init__(self, text):
         self.text = text
 
-    def _display(self, panelName, text):
-        if not sublime.load_settings("SQLExec.sublime-settings").get('show_result_on_window'):
+    def _clean_text(self, text):
+        lines = text.split('\n')
+        header = lines[0]
+        fields = lines[1]
+        lines = lines[2:-3]
+        indexes = [(i.start(), i.end()) for i in list(re.finditer('-+', fields))]
+        csv_sep = sublime.load_settings("SQLExec.sublime-settings").get('csv_separator', ';')
+        text = csv_sep.join([header[index[0]:index[1]].strip() for index in indexes]) + '\n'
+        text = text + '\n'.join([csv_sep.join([line[index[0]:index[1]].strip() for index in indexes]) for line in lines])
+        return text
+
+    def _display(self, panelName, text, export = False):
+        if not sublime.load_settings("SQLExec.sublime-settings").get('show_result_on_window') and not export:
             panel = sublime.active_window().create_output_panel(panelName)
             sublime.active_window().run_command("show_panel", {"panel": "output." + panelName})
         else:
@@ -72,11 +83,14 @@ class Command:
 
         panel.set_read_only(False)
         panel.set_syntax_file('Packages/SQL/SQL.tmLanguage')
+        text = self._clean_text(text) if export else text
         panel.run_command('append', {'characters': text})
+        if export:
+            panel.run_command('save')
         panel.set_read_only(True)
 
-    def _result(self, text):
-        self._display('SQLExec', text)
+    def _result(self, text, export = False):
+        self._display('SQLExec', text, export)
 
     def _errors(self, text):
         self._display('SQLExec.errors', text)
@@ -90,11 +104,11 @@ class Command:
 
         return results.decode('utf-8', 'replace').replace('\r', '')
 
-    def show(self):
+    def show(self, export = False):
         results = self.run()
 
         if results:
-            self._result(results)
+            self._result(results, export)
 
 class Selection:
     def __init__(self, view):
@@ -210,6 +224,15 @@ class sqlExecute(sublime_plugin.WindowCommand):
         if connection != None:
             selection = Selection(self.window.active_view())
             connection.execute(selection.getQueries())
+        else:
+            sublime.error_message('No active connection')
+
+class sqlExport(sublime_plugin.WindowCommand):
+    def run(self):
+        global connection
+        if connection != None:
+            selection = Selection(self.window.active_view())
+            connection.execute(selection.getQueries(), export = True)
         else:
             sublime.error_message('No active connection')
 
