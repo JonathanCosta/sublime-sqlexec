@@ -80,8 +80,16 @@ class Connection:
 
         panel.settings().set("word_wrap", "false")
         panel.set_read_only(False)
-        panel.set_syntax_file('Packages/SQL/SQL.sublime-syntax')
-        if results: panel.run_command('append', {'characters': results})
+
+        # Huge amounts of text tend to freeze up Sublime's UI
+        if len(results) > 10000000:
+            panel.set_syntax_file('Packages/Text/Plain text.tmLanguage')
+            for i in range(0, len(results), 1000000):
+                panel.run_command('append', {'characters': results[i:i+1000000]})
+        elif results:
+            panel.set_syntax_file('Packages/SQL/SQL.sublime-syntax')
+            panel.run_command('append', {'characters': results})
+
         if errors: panel.run_command('append', {'characters': errors})
         status_message('Query executed in {:.3f}s'.format(elapsed))
         panel.set_read_only(True)
