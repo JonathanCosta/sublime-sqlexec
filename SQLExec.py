@@ -1,4 +1,4 @@
-import sublime, sublime_plugin, os, subprocess, signal, sys
+import sublime, sublime_plugin, os, re, subprocess, signal, sys
 from time import time, sleep
 from threading import Thread, Timer
 
@@ -165,7 +165,8 @@ class Command(Thread):
         self.command_text = " ".join(args)
 
     def run(self):
-        decode = lambda t: t.decode('utf-8', 'replace').replace('\r', '').rstrip()
+        re_endings = re.compile(r'\\r|\s*\+\s*$')
+        decode = lambda t: re_endings.sub('', t.decode('utf-8', 'replace')).rstrip()
 
         start_time = time()
 
