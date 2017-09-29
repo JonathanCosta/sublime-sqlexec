@@ -160,7 +160,7 @@ class StatusSpinner(Thread):
         start_time = time()
         while self.watched_thread.isAlive():
             status_message("{:.0f}s".format(time() - start_time))
-            sleep(1)
+            sleep(0.5)
 
 class Command(Thread):
     def __init__(self, args, query, on_done):
