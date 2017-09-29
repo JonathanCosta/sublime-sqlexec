@@ -18,8 +18,9 @@ def getSelectionQueries(view):
 def input_panel(caption, initial='', on_done=None, on_change=None, on_cancel=None):
     return sublime.active_window().show_input_panel(caption, initial or '', on_done, on_change, on_cancel)
 
-def quick_select(items, on_select):
+def quick_select(items, on_select, selected_index=None):
     items = filter_dupes(items)
+
     if not hasattr(quick_select, 'cached_items'):
         setattr(quick_select, 'cached_items', {})
     cached_items = getattr(quick_select, 'cached_items', {})
@@ -30,7 +31,10 @@ def quick_select(items, on_select):
             setattr(quick_select, 'cached_items', cached_items)
             on_select(items[index])
 
-    sublime.active_window().show_quick_panel(items, select, selected_index=cached_items.get(hash(tuple(items)), 0))
+    if selected_index is None or selected_index < 0:
+        selected_index = cached_items.get(hash(tuple(items)), 0)
+
+    sublime.active_window().show_quick_panel(items, select, selected_index=selected_index)
 
 def status_message(message):
     sublime.status_message(" SQLExec: {}".format(message))
@@ -303,7 +307,7 @@ class sqlExplain(sublime_plugin.WindowCommand):
 
 class sqlListConnection(sublime_plugin.WindowCommand):
     def run(self):
-        quick_select(Options.list(), sqlChangeConnection)
+        quick_select(Options.list(), sqlChangeConnection, next((i for i, name in enumerate(Options.list()) if Options(name).is_default), 0))
 
 def defaultConnection():
     name = next((name for name in Options.list() if Options(name).is_default), None)
