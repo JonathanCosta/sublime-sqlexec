@@ -21,7 +21,7 @@
             },
             "desc func" : {
                 "query": "select pg_get_functiondef(oid) from pg_proc where proname = '%s';",
-                "options": ["-P null=\"<NULL>\""],
+                "options": ["-t", "-P null=\"<NULL>\""],
                 "format": "|%s|"
             },
             "show records": {
