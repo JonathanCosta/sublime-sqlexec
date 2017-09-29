@@ -1,4 +1,4 @@
-import sublime, sublime_plugin, os, subprocess, signal, sys
+import sublime, sublime_plugin, os, re, subprocess, signal, sys
 from time import time, sleep
 from threading import Thread, Timer
 
@@ -80,8 +80,16 @@ class Connection:
 
         panel.settings().set("word_wrap", "false")
         panel.set_read_only(False)
-        panel.set_syntax_file('Packages/SQL/SQL.sublime-syntax')
-        if results: panel.run_command('append', {'characters': results})
+
+        # Huge amounts of text tend to freeze up Sublime's UI
+        if len(results) > 10000000:
+            panel.set_syntax_file('Packages/Text/Plain text.tmLanguage')
+            for i in range(0, len(results), 1000000):
+                panel.run_command('append', {'characters': results[i:i+1000000]})
+        elif results:
+            panel.set_syntax_file('Packages/SQL/SQL.sublime-syntax')
+            panel.run_command('append', {'characters': results})
+
         if errors: panel.run_command('append', {'characters': errors})
         status_message('Query executed in {:.3f}s'.format(elapsed))
         panel.set_read_only(True)
@@ -157,7 +165,8 @@ class Command(Thread):
         self.command_text = " ".join(args)
 
     def run(self):
-        decode = lambda t: t.decode('utf-8', 'replace').replace('\r', '').rstrip()
+        re_endings = re.compile(r'\\r|\s*\+\s*$')
+        decode = lambda t: re_endings.sub('', t.decode('utf-8', 'replace')).rstrip()
 
         start_time = time()
 
