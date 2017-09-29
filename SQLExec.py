@@ -233,7 +233,7 @@ class Options(dict):
         self.update(settings().get('connections').get(name, {}))
 
     def __getattr__(self, key):
-        return self[key]
+        return self.get(key, None)
 
     @staticmethod
     def list():
