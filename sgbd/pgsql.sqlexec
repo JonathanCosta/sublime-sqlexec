@@ -24,6 +24,11 @@
                 "options": ["-t", "-P null=\"<NULL>\""],
                 "format": "|%s|"
             },
+            "explain" : {
+                "query": "explain analyze %s;",
+                "options": ["-t"],
+                "format": "|%s|"
+            },
             "show records": {
                 "query": "select * from %s limit 100",
                 "options": ["-P null=\"<NULL>\""],

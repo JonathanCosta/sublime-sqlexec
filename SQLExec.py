@@ -106,6 +106,11 @@ class Connection:
         args = self.command + self.settings['options']
         self._execute(args, query, self._display)
 
+    def explain(self, query):
+        args = self.command + self.settings['queries']['explain']['options']
+        query = self.settings['queries']['explain']['query'] % query
+        self._execute(args, query, self._display)
+
     def getTables(self, cb):
         args = self.command + self.settings['queries']['desc']['options']
         query = self.settings['queries']['desc']['query']
@@ -244,6 +249,11 @@ def executeQuery(query):
     history = filter_dupes([query] + history)[:50]
     con().execute(query)
 
+def explainQuery(query):
+    global history
+    history = filter_dupes([query] + history)[:50]
+    con().explain(query)
+
 class sqlHistory(sublime_plugin.WindowCommand):
     def run(self):
         if history:
@@ -275,6 +285,10 @@ class sqlQuery(sublime_plugin.WindowCommand):
     def run(self):
         input_panel('Enter query', history[0] if history else None, executeQuery)
 
+class sqlExplainQuery(sublime_plugin.WindowCommand):
+    def run(self):
+        input_panel('Enter query', history[0] if history else None, explainQuery)
+
 class sqlColumn(sublime_plugin.WindowCommand):
     def run(self):
         con().getColumns(lambda columns: quick_select(columns, con().descColumn))
@@ -282,6 +296,10 @@ class sqlColumn(sublime_plugin.WindowCommand):
 class sqlExecute(sublime_plugin.WindowCommand):
     def run(self):
         con().execute(getSelectionQueries(self.window.active_view()))
+
+class sqlExplain(sublime_plugin.WindowCommand):
+    def run(self):
+        con().explain(getSelectionQueries(self.window.active_view()))
 
 class sqlListConnection(sublime_plugin.WindowCommand):
     def run(self):
