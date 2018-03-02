@@ -98,13 +98,18 @@ class Connection:
         status_message('Query executed in {:.3f}s'.format(elapsed))
         panel.set_read_only(True)
 
-    def _execute(self, args, query, cb):
+    def _execute(self, args, query, cb, async=True):
         def cleanup(*args):
             self.active_command = None
             cb(*args)
         if self.active_command:
             self.active_command.stop()
-        self.active_command = Command.start_async(args, query, cleanup)
+
+        if async:
+            self.active_command = Command.start_async(args, query, cleanup)
+        else:
+            self.active_command = Command(args, query, cleanup)
+            self.active_command.run()
 
     def execute(self, query):
         args = self.command + self.settings['options']
@@ -115,20 +120,20 @@ class Connection:
         query = self.settings['queries']['explain']['query'] % query
         self._execute(args, query, self._display)
 
-    def getTables(self, cb):
+    def getTables(self, cb, async=True):
         args = self.command + self.settings['queries']['desc']['options']
         query = self.settings['queries']['desc']['query']
-        self._execute(args, query, lambda results, errors, elapsed: cb(self._parseResults(results)))
+        self._execute(args, query, (lambda results, errors, elapsed: cb(self._parseResults(results))), async)
 
-    def getFunctions(self, cb):
+    def getFunctions(self, cb, async=True):
         args = self.command + self.settings['queries']['func list']['options']
         query = self.settings['queries']['func list']['query']
-        self._execute(args, query, lambda results, errors, elapsed: cb(self._parseResults(results)))
+        self._execute(args, query, (lambda results, errors, elapsed: cb(self._parseResults(results))), async)
 
-    def getColumns(self, cb):
+    def getColumns(self, cb, async=True):
         args = self.command + self.settings['queries']['column list']['options']
         query = self.settings['queries']['column list']['query']
-        self._execute(args, query, lambda results, errors, elapsed: cb(self._parseResults(results)))
+        self._execute(args, query, (lambda results, errors, elapsed: cb(self._parseResults(results))), async)
 
     def showRecentTableRecords(self, tableName):
         args = self.command + self.settings['queries']['show recent records']['options']
@@ -271,19 +276,19 @@ class sqlEditHistory(sublime_plugin.WindowCommand):
 
 class sqlDesc(sublime_plugin.WindowCommand):
     def run(self):
-        con().getTables(lambda tables: quick_select(tables, con().descTable))
+        con().getTables(lambda tables: quick_select(tables, con().descTable), False)
 
 class sqlDescFunc(sublime_plugin.WindowCommand):
     def run(self):
-        con().getFunctions(lambda functions: quick_select(functions, con().descFunc))
+        con().getFunctions(lambda functions: quick_select(functions, con().descFunc), False)
 
 class sqlShowRecentRecords(sublime_plugin.WindowCommand):
     def run(self):
-        con().getTables(lambda tables: quick_select(tables, con().showRecentTableRecords))
+        con().getTables(lambda tables: quick_select(tables, con().showRecentTableRecords), False)
 
 class sqlShowRecords(sublime_plugin.WindowCommand):
     def run(self):
-        con().getTables(lambda tables: quick_select(tables, con().showTableRecords))
+        con().getTables(lambda tables: quick_select(tables, con().showTableRecords), False)
 
 class sqlQuery(sublime_plugin.WindowCommand):
     def run(self):
@@ -295,7 +300,7 @@ class sqlExplainQuery(sublime_plugin.WindowCommand):
 
 class sqlColumn(sublime_plugin.WindowCommand):
     def run(self):
-        con().getColumns(lambda columns: quick_select(columns, con().descColumn))
+        con().getColumns(lambda columns: quick_select(columns, con().descColumn), False)
 
 class sqlExecute(sublime_plugin.WindowCommand):
     def run(self):
