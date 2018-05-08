@@ -72,8 +72,8 @@ class Connection:
         results = [[v.strip() for v in row.split('|')[1:-1]] if '|' in row else [row.strip()] for row in results.strip().splitlines()]
         return [r[0] for r in results] if results and len(results[0]) == 1 else results
 
-    def _display(self, results, errors, elapsed):
-        if not results and not errors:
+    def _display(self, results, elapsed):
+        if not results:
             return
 
         if not settings().get('show_result_on_window'):
@@ -94,18 +94,17 @@ class Connection:
             panel.set_syntax_file('Packages/SQL/SQL.sublime-syntax')
             panel.run_command('append', {'characters': results})
 
-        if errors: panel.run_command('append', {'characters': errors})
         status_message('Query executed in {:.3f}s'.format(elapsed))
         panel.set_read_only(True)
 
-    def _execute(self, args, query, cb, async=True):
+    def _execute(self, args, query, cb, run_async=True):
         def cleanup(*args):
             self.active_command = None
             cb(*args)
         if self.active_command:
             self.active_command.stop()
 
-        if async:
+        if run_async:
             self.active_command = Command.start_async(args, query, cleanup)
         else:
             self.active_command = Command(args, query, cleanup)
@@ -120,20 +119,20 @@ class Connection:
         query = self.settings['queries']['explain']['query'] % query
         self._execute(args, query, self._display)
 
-    def getTables(self, cb, async=True):
+    def getTables(self, cb, run_async=True):
         args = self.command + self.settings['queries']['desc']['options']
         query = self.settings['queries']['desc']['query']
-        self._execute(args, query, (lambda results, errors, elapsed: cb(self._parseResults(results))), async)
+        self._execute(args, query, (lambda results, elapsed: cb(self._parseResults(results))), run_async)
 
-    def getFunctions(self, cb, async=True):
+    def getFunctions(self, cb, run_async=True):
         args = self.command + self.settings['queries']['func list']['options']
         query = self.settings['queries']['func list']['query']
-        self._execute(args, query, (lambda results, errors, elapsed: cb(self._parseResults(results))), async)
+        self._execute(args, query, (lambda results, elapsed: cb(self._parseResults(results))), run_async)
 
-    def getColumns(self, cb, async=True):
+    def getColumns(self, cb, run_async=True):
         args = self.command + self.settings['queries']['column list']['options']
         query = self.settings['queries']['column list']['query']
-        self._execute(args, query, (lambda results, errors, elapsed: cb(self._parseResults(results))), async)
+        self._execute(args, query, (lambda results, elapsed: cb(self._parseResults(results))), run_async)
 
     def showRecentTableRecords(self, tableName):
         args = self.command + self.settings['queries']['show recent records']['options']
@@ -189,13 +188,12 @@ class Command(Thread):
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-        self.process = subprocess.Popen(self.command_text, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, startupinfo=startupinfo)
+        self.process = subprocess.Popen(self.command_text, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, startupinfo=startupinfo)
         self.process.stdin.write(self.query.encode())
         self.process.stdin.close()
 
         results = "\n".join([decode(l) for l in self.process.stdout])
-        errors = "\n".join([decode(l) for l in self.process.stderr])
-        self.on_done(results, errors, time() - start_time)
+        self.on_done(results, time() - start_time)
 
     def stop(self):
         if not self.process or self.process.poll() is not None:
@@ -238,6 +236,7 @@ class Command(Thread):
 
 class Options(dict):
     def __init__(self, name):
+        super().__init__(self)
         self['name'] = name
         self.update(settings().get('connections').get(name, {}))
 
