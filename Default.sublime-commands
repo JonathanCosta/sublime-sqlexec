@@ -8,6 +8,10 @@
     "command": "sql_execute"
   },
   {
+    "caption": "SQLExec: Explain",
+    "command": "sql_explain"
+  },
+  {
     "caption": "SQLExec: History",
     "command": "sql_history"
   },
@@ -18,6 +22,10 @@
   {
     "caption": "SQLExec: Type Query",
     "command": "sql_query"
+  },
+  {
+    "caption": "SQLExec: Explain Query",
+    "command": "sql_explain_query"
   },
   {
     "caption": "SQLExec: Show Table Records",

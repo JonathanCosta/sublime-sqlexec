@@ -18,8 +18,9 @@ def getSelectionQueries(view):
 def input_panel(caption, initial='', on_done=None, on_change=None, on_cancel=None):
     return sublime.active_window().show_input_panel(caption, initial or '', on_done, on_change, on_cancel)
 
-def quick_select(items, on_select):
+def quick_select(items, on_select, selected_index=None):
     items = filter_dupes(items)
+
     if not hasattr(quick_select, 'cached_items'):
         setattr(quick_select, 'cached_items', {})
     cached_items = getattr(quick_select, 'cached_items', {})
@@ -30,7 +31,10 @@ def quick_select(items, on_select):
             setattr(quick_select, 'cached_items', cached_items)
             on_select(items[index])
 
-    sublime.active_window().show_quick_panel(items, select, selected_index=cached_items.get(hash(tuple(items)), 0))
+    if selected_index is None or selected_index < 0:
+        selected_index = cached_items.get(hash(tuple(items)), 0)
+
+    sublime.active_window().show_quick_panel(items, select, selected_index=selected_index)
 
 def status_message(message):
     sublime.status_message(" SQLExec: {}".format(message))
@@ -68,8 +72,8 @@ class Connection:
         results = [[v.strip() for v in row.split('|')[1:-1]] if '|' in row else [row.strip()] for row in results.strip().splitlines()]
         return [r[0] for r in results] if results and len(results[0]) == 1 else results
 
-    def _display(self, results, errors, elapsed):
-        if not results and not errors:
+    def _display(self, results, elapsed):
+        if not results:
             return
 
         if not settings().get('show_result_on_window'):
@@ -90,36 +94,45 @@ class Connection:
             panel.set_syntax_file('Packages/SQL/SQL.sublime-syntax')
             panel.run_command('append', {'characters': results})
 
-        if errors: panel.run_command('append', {'characters': errors})
         status_message('Query executed in {:.3f}s'.format(elapsed))
         panel.set_read_only(True)
 
-    def _execute(self, args, query, cb):
+    def _execute(self, args, query, cb, run_async=True):
         def cleanup(*args):
             self.active_command = None
             cb(*args)
         if self.active_command:
             self.active_command.stop()
-        self.active_command = Command.start_async(args, query, cleanup)
+
+        if run_async:
+            self.active_command = Command.start_async(args, query, cleanup)
+        else:
+            self.active_command = Command(args, query, cleanup)
+            self.active_command.run()
 
     def execute(self, query):
         args = self.command + self.settings['options']
         self._execute(args, query, self._display)
 
-    def getTables(self, cb):
+    def explain(self, query):
+        args = self.command + self.settings['queries']['explain']['options']
+        query = self.settings['queries']['explain']['query'] % query
+        self._execute(args, query, self._display)
+
+    def getTables(self, cb, run_async=True):
         args = self.command + self.settings['queries']['desc']['options']
         query = self.settings['queries']['desc']['query']
-        self._execute(args, query, lambda results, errors, elapsed: cb(self._parseResults(results)))
+        self._execute(args, query, (lambda results, elapsed: cb(self._parseResults(results))), run_async)
 
-    def getFunctions(self, cb):
+    def getFunctions(self, cb, run_async=True):
         args = self.command + self.settings['queries']['func list']['options']
         query = self.settings['queries']['func list']['query']
-        self._execute(args, query, lambda results, errors, elapsed: cb(self._parseResults(results)))
+        self._execute(args, query, (lambda results, elapsed: cb(self._parseResults(results))), run_async)
 
-    def getColumns(self, cb):
+    def getColumns(self, cb, run_async=True):
         args = self.command + self.settings['queries']['column list']['options']
         query = self.settings['queries']['column list']['query']
-        self._execute(args, query, lambda results, errors, elapsed: cb(self._parseResults(results)))
+        self._execute(args, query, (lambda results, elapsed: cb(self._parseResults(results))), run_async)
 
     def showRecentTableRecords(self, tableName):
         args = self.command + self.settings['queries']['show recent records']['options']
@@ -155,7 +168,7 @@ class StatusSpinner(Thread):
         start_time = time()
         while self.watched_thread.isAlive():
             status_message("{:.0f}s".format(time() - start_time))
-            sleep(1)
+            sleep(0.5)
 
 class Command(Thread):
     def __init__(self, args, query, on_done):
@@ -175,13 +188,12 @@ class Command(Thread):
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-        self.process = subprocess.Popen(self.command_text, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, startupinfo=startupinfo)
+        self.process = subprocess.Popen(self.command_text, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, startupinfo=startupinfo)
         self.process.stdin.write(self.query.encode())
         self.process.stdin.close()
 
         results = "\n".join([decode(l) for l in self.process.stdout])
-        errors = "\n".join([decode(l) for l in self.process.stderr])
-        self.on_done(results, errors, time() - start_time)
+        self.on_done(results, time() - start_time)
 
     def stop(self):
         if not self.process or self.process.poll() is not None:
@@ -224,11 +236,12 @@ class Command(Thread):
 
 class Options(dict):
     def __init__(self, name):
+        super().__init__(self)
         self['name'] = name
         self.update(settings().get('connections').get(name, {}))
 
     def __getattr__(self, key):
-        return self[key]
+        return self.get(key, None)
 
     @staticmethod
     def list():
@@ -244,6 +257,11 @@ def executeQuery(query):
     history = filter_dupes([query] + history)[:50]
     con().execute(query)
 
+def explainQuery(query):
+    global history
+    history = filter_dupes([query] + history)[:50]
+    con().explain(query)
+
 class sqlHistory(sublime_plugin.WindowCommand):
     def run(self):
         if history:
@@ -257,35 +275,43 @@ class sqlEditHistory(sublime_plugin.WindowCommand):
 
 class sqlDesc(sublime_plugin.WindowCommand):
     def run(self):
-        con().getTables(lambda tables: quick_select(tables, con().descTable))
+        con().getTables(lambda tables: quick_select(tables, con().descTable), False)
 
 class sqlDescFunc(sublime_plugin.WindowCommand):
     def run(self):
-        con().getFunctions(lambda functions: quick_select(functions, con().descFunc))
+        con().getFunctions(lambda functions: quick_select(functions, con().descFunc), False)
 
 class sqlShowRecentRecords(sublime_plugin.WindowCommand):
     def run(self):
-        con().getTables(lambda tables: quick_select(tables, con().showRecentTableRecords))
+        con().getTables(lambda tables: quick_select(tables, con().showRecentTableRecords), False)
 
 class sqlShowRecords(sublime_plugin.WindowCommand):
     def run(self):
-        con().getTables(lambda tables: quick_select(tables, con().showTableRecords))
+        con().getTables(lambda tables: quick_select(tables, con().showTableRecords), False)
 
 class sqlQuery(sublime_plugin.WindowCommand):
     def run(self):
         input_panel('Enter query', history[0] if history else None, executeQuery)
 
+class sqlExplainQuery(sublime_plugin.WindowCommand):
+    def run(self):
+        input_panel('Enter query', history[0] if history else None, explainQuery)
+
 class sqlColumn(sublime_plugin.WindowCommand):
     def run(self):
-        con().getColumns(lambda columns: quick_select(columns, con().descColumn))
+        con().getColumns(lambda columns: quick_select(columns, con().descColumn), False)
 
 class sqlExecute(sublime_plugin.WindowCommand):
     def run(self):
         con().execute(getSelectionQueries(self.window.active_view()))
 
+class sqlExplain(sublime_plugin.WindowCommand):
+    def run(self):
+        con().explain(getSelectionQueries(self.window.active_view()))
+
 class sqlListConnection(sublime_plugin.WindowCommand):
     def run(self):
-        quick_select(Options.list(), sqlChangeConnection)
+        quick_select(Options.list(), sqlChangeConnection, next((i for i, name in enumerate(Options.list()) if Options(name).is_default), 0))
 
 def defaultConnection():
     name = next((name for name in Options.list() if Options(name).is_default), None)
