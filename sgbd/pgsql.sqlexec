@@ -2,21 +2,51 @@
     "sql_exec": {
         "options": [],
         "before": [],
-        "args": "-h {options.host} -p {options.port} -U \"{options.username}\" -d \"{options.database}\"",
+        "args": "-h {host} -p {port} -U \"{username}\" -d \"{database}\"",
         "queries": {
             "desc" : {
-                "query": "SELECT  '| ' || CASE WHEN n.nspname = current_schema() THEN quote_ident(c.relname) ELSE quote_ident(n.nspname)||'.'||quote_ident(c.relname) END ||' |' AS tblname FROM pg_catalog.pg_class AS c INNER JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace WHERE relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'pg_toast', 'information_schema') ORDER BY n.nspname = current_schema() DESC, pg_catalog.pg_table_is_visible(c.oid) DESC, n.nspname, c.relname",
-                "options": ["-t"],
+                "query": "SELECT  '| ' || CASE WHEN n.nspname = current_schema() THEN quote_ident(c.relname) ELSE quote_ident(n.nspname)||'.'||quote_ident(c.relname) END ||' |' AS tblname FROM pg_catalog.pg_class AS c INNER JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace WHERE relkind in ('r','v') AND n.nspname NOT IN ('pg_catalog', 'pg_toast', 'information_schema') ORDER BY n.nspname = current_schema() DESC, pg_catalog.pg_table_is_visible(c.oid) DESC, n.nspname, c.relname",
+                "options": ["-t", "-P null=\"<NULL>\""],
                 "format" : "|%s|"
             },
             "desc table": {
                 "query": "\\d+ %s",
-                "options": [],
+                "options": ["-P null=\"<NULL>\""],
                 "format" : "|%s|"
+            },
+            "func list" : {
+                "query": "SELECT '| ' || proname || ' |' AS funcname FROM pg_catalog.pg_proc AS c INNER JOIN pg_catalog.pg_namespace AS n ON n.oid = c.pronamespace ORDER BY proname",
+                "options": ["-t", "-P null=\"<NULL>\""],
+                "format": "|%s|"
+            },
+            "desc func" : {
+                "query": "select pg_get_functiondef(oid) from pg_proc where proname = '%s';",
+                "options": ["-t", "-P null=\"<NULL>\""],
+                "format": "|%s|"
+            },
+            "explain" : {
+                "query": "explain analyze %s;",
+                "options": ["-t"],
+                "format": "|%s|"
             },
             "show records": {
                 "query": "select * from %s limit 100",
-                "options": [],
+                "options": ["-P null=\"<NULL>\""],
+                "format" : "|%s|"
+            },
+            "show recent records": {
+                "query": "select * from %s order by %sid DESC limit 100",
+                "options": ["-P null=\"<NULL>\""],
+                "format" : "|%s|"
+            },
+            "column list": {
+                "query": "SELECT DISTINCT column_name FROM INFORMATION_SCHEMA.columns ORDER BY column_name ASC;",
+                "options": ["-t", "-P null=\"<NULL>\""],
+                "format" : "|%s|"
+            },
+            "desc column": {
+                "query": "SELECT * FROM INFORMATION_SCHEMA.columns WHERE column_name = '%s' ORDER BY table_schema, table_name;",
+                "options": ["-P null=\"<NULL>\""],
                 "format" : "|%s|"
             }
         }
