@@ -8,6 +8,10 @@
     "command": "sql_execute"
   },
   {
+    "caption": "SQLExec: Export",
+    "command": "sql_export"
+  },
+  {
     "caption": "SQLExec: History",
     "command": "sql_history"
   },

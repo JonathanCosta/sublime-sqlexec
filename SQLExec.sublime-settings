@@ -7,5 +7,6 @@
         "vertica": "vsql",
     },
     "connections": {
-    }
+    },
+    "csv_separator": ";",
 }
