@@ -1,6 +1,7 @@
 import sublime, sublime_plugin, tempfile, os, subprocess, re
 
 connection = None
+debug = sublime.load_settings("SQLExec.sublime-settings").get('sql_exec.debug')
 history = ['']
 
 class Connection:
@@ -110,7 +111,10 @@ class Command:
 
     def run(self):
         sublime.status_message(' SQLExec: running SQL command')
-        results, errors = subprocess.Popen(self.text, stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True).communicate()
+        if debug:
+            sublime.message_dialog('Command: ' + str(self.text))
+        results, errors = subprocess.Popen(self.text, stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True, env=os.environ.copy()).communicate()
+
         encoding = 'utf-8' if self.encoding is None else self.encoding
         if not results and errors:
             self._errors(errors.decode(encoding, 'replace').replace('\r', ''))
@@ -144,7 +148,8 @@ class Options:
         self.host     = connections[self.name]['host']
         self.port     = connections[self.name]['port']
         self.username = connections[self.name]['username']
-        self.password = connections[self.name]['password']
+        if 'password' in connections[self.name]:
+            self.password = connections[self.name]['password']
         self.database = connections[self.name]['database']
         self.encoding = connections[self.name].get('encoding')
         if 'service' in connections[self.name]:
