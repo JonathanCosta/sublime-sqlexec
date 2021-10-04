@@ -65,14 +65,25 @@ class Command:
 
     def _clean_text(self, text):
         lines = text.split('\n')
-        header = lines[0]
-        fields = lines[1]
-        lines = lines[2:-3]
-        indexes = [(i.start(), i.end()) for i in list(re.finditer('-+', fields))]
-        csv_sep = sublime.load_settings("SQLExec.sublime-settings").get('csv_separator', ';')
-        text = csv_sep.join([header[index[0]:index[1]].strip() for index in indexes]) + '\n'
-        text = text + '\n'.join([csv_sep.join([line[index[0]:index[1]].strip() for index in indexes]) for line in lines])
-        return text
+        tabularData = [];
+        for line in lines:
+            mat = re.search('((-+)|)(\+)((-+)|)',line)
+            if mat:
+                continue
+            if line[0:1] == "|":
+                line = line[1:]
+            if line.endswith("|"):
+                line = line[:-1]
+            columns = re.split('(?<!\\\B)\|',line);
+            tableCol = []
+            for col in columns:
+                col = col.strip()
+                if col.find(",") > 0:
+                    col = '"' + col + '"';
+                col = re.sub('/\\\|/',"|",col);
+                tableCol.append(col)
+            tabularData.append(",".join(tableCol))
+        return "\n".join(tabularData)
 
     def _display(self, panelName, text, export = False):
         if not sublime.load_settings("SQLExec.sublime-settings").get('show_result_on_window') and not export:
@@ -86,6 +97,7 @@ class Command:
         text = self._clean_text(text) if export else text
         panel.run_command('append', {'characters': text})
         if export:
+            panel.set_name(panelName+".csv")
             panel.run_command('save')
         panel.set_read_only(True)
 
