@@ -18,6 +18,11 @@
                 "query": "select * from `%s` limit 100",
                 "options": ["-f", "--table"],
                 "format" : "|%s|"
+            },
+            "show databases": {
+                "query": "show databases",
+                "options": ["-f", "--table", "--skip-column-names"],
+                "format" : "|%s|"
             }
         }
     }

@@ -31,10 +31,29 @@ class Connection:
 
         return Command(cmd, self.options.encoding)
 
+    def setDatabaes(self, index):
+        self.options.database = self.tempArray[index]
+
     def execute(self, queries, export = False):
         command = self._getCommand(self.settings['options'], queries)
         command.show(export)
         os.unlink(self.tmp.name)
+
+    def showDatabases(self):
+        query = self.settings['queries']['show databases']['query']
+        command = self._getCommand(self.settings['queries']['show databases']['options'], query)
+
+        db = []
+        command.show()
+        for result in command.run().splitlines():
+            try:
+                db.append(result.split('|')[1].strip())
+            except IndexError:
+                pass
+        os.unlink(self.tmp.name)
+
+        self.tempArray = db
+        return db
 
     def desc(self):
         query = self.settings['queries']['desc']['query']
@@ -277,6 +296,14 @@ class sqlDesc(sublime_plugin.WindowCommand):
         else:
             sublime.error_message('No active connection')
 
+class sqlShowDatabases(sublime_plugin.WindowCommand):
+    def run(self):
+        if connection != None:
+            db = connection.showDatabases()
+            # //sublime.error_message('No active ssssssss')
+            sublime.active_window().show_quick_panel(db, setDatabaes)
+        else:
+            sublime.error_message('No active connection')
 
 class sqlShowFunction(sublime_plugin.WindowCommand):
     def run(self):

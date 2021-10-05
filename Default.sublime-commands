@@ -26,5 +26,9 @@
   {
     "caption": "SQLExec: Desc Table",
     "command": "sql_desc"
+  },
+  {
+    "caption": "SQLExec: Change Database",
+    "command": "sql_show_databases"
   }
 ]
