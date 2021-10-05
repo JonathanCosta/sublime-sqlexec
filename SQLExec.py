@@ -67,6 +67,7 @@ class Command:
 
     def _clean_text(self, text):
         lines = text.split('\n')
+        csv_sep = sublime.load_settings("SQLExec.sublime-settings").get('csv_separator', ';')
         tabularData = [];
         for line in lines:
             mat = re.search('((-+)|)(\+)((-+)|)',line)
@@ -80,11 +81,11 @@ class Command:
             tableCol = []
             for col in columns:
                 col = col.strip()
-                if col.find(",") > 0:
+                if col.find(csv_sep) > 0:
                     col = '"' + col + '"';
                 col = re.sub('/\\\|/',"|",col);
                 tableCol.append(col)
-            tabularData.append(",".join(tableCol))
+            tabularData.append(csv_sep.join(tableCol))
         return "\n".join(tabularData)
 
     def _display(self, panelName, text, export = False):
