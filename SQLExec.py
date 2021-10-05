@@ -1,35 +1,37 @@
-import sublime, sublime_plugin, tempfile, os, re, subprocess
-from time import sleep
-import threading
+import sublime, sublime_plugin, os, re, subprocess
+import tempfile
+from datetime import datetime
+from string import Template
 
 connection = None
-debug = sublime.load_settings("SQLExec.sublime-settings").get('sql_exec.debug')
+debug = sqlexec_settings.get('sql_exec.debug')
 history = ['']
-
+sqlexec_settings = sublime.load_settings("SQLExec.sublime-settings")
 class Connection:
     def __init__(self, options):
-        self.settings = sublime.load_settings(options.type + ".sqlexec").get(
-            'sql_exec')
-        self.command  = sublime.load_settings("SQLExec.sublime-settings").get(
-            'sql_exec.commands')[options.type]
-        self.options  = options
+        self.query = ''
+        self.db_type = options.type
+        self.name = '{}: {}@{}'.format(options.type, options.username, options.host)
+        self.settings = sublime.load_settings(options.type + ".sqlexec").get('sql_exec')
+        self.command = sqlexec_settings.get('sql_exec.commands')[options.type]
+        self.options = options
 
     def _buildCommand(self, options):
         return (self.command + ' ' + ' '.join(options) + ' ' +
             self.settings['args'].format(options=self.options))
 
     def _getCommand(self, options, queries, header=''):
-        command  = self._buildCommand(options)
+        if not isinstance(queries, list):
+            queries = [queries]
+        self.write_query_file(self.settings['before'] + queries)
+
+        command = self._buildCommand(options)
+        return Command('%s < "%s"' % (command, self.tmp.name), self.options.encoding)
+
+    def write_query_file(self, query_list):
         self.tmp = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.sql')
-        for query in self.settings['before']:
-            self.tmp.write(query + "\n")
-        for query in queries:
-            self.tmp.write(query)
+        self.tmp.write("\n".join(query_list))
         self.tmp.close()
-
-        cmd = '%s < "%s"' % (command, self.tmp.name)
-
-        return Command(cmd, self.options.encoding)
 
     def setDatabaes(self, index):
         self.options.database = self.tempArray[index]
@@ -56,19 +58,23 @@ class Connection:
         return db
 
     def desc(self):
-        query = self.settings['queries']['desc']['query']
-        command = self._getCommand(self.settings['queries']['desc']['options'],
-            query)
+        self.query = self.settings['queries']['desc']['query']
+        command = self._getCommand(self.settings['queries']['desc']['options'], self.query)
 
         tables = []
-        for result in command.run().splitlines():
-            try:
-                tables.append(result.split('|')[1].strip())
-            except IndexError:
-                pass
-
+        results = command.run().splitlines()
+        if self.db_type == 'sqlite':
+            results = ' '.join(results)
+            results = results.split()
+        for result in results:
+            if result and '|' in result:
+                try:
+                    tables.append(result.split('|')[1].strip())
+                except IndexError:
+                    pass
+            else:
+                tables.append(result)
         os.unlink(self.tmp.name)
-
         return tables
 
     def listFunc(self):
@@ -88,36 +94,38 @@ class Connection:
         return funcs
 
     def descTable(self, tableName):
-        query = self.settings['queries']['desc table']['query'] % tableName
-        command = self._getCommand(self.settings['queries']['desc table']['options'],
-            query)
-        command.show()
+        self.query = self.settings['queries']['desc table']['query'] % tableName
+        command = self._getCommand(self.settings['queries']['desc table']['options'], self.query)
+        tabledesc = command.run()
 
+        if self.db_type == 'sqlite':
+            tabledesc = SQLite(table_name=tableName, result=tabledesc).get_table_desc()
+        
+        command.show(False,tabledesc)
         os.unlink(self.tmp.name)
 
     def descFunc(self, tableName):
         command = self._getCommand([], '\sf {}'.format(tableName))
         command.show()
-
         os.unlink(self.tmp.name)
 
     def showTableRecords(self, tableName):
-        query = self.settings['queries']['show records']['query'] % tableName
-        command = self._getCommand(self.settings['queries']['show records'][
-            'options'], query)
+        self.query = self.settings['queries']['show records']['query'] % tableName
+        command = self._getCommand(self.settings['queries']['show records']['options'], self.query)
         command.show()
 
         os.unlink(self.tmp.name)
-
 
 class Command:
     def __init__(self, text, encoding = None):
         self.text = text
         self.encoding = encoding
+        self.template = Template('$dbinfo    $qtime\nSQL> $query\n\n$result')
+        self.show_result_on_window = sqlexec_settings.get('show_result_on_window')
 
     def _clean_text(self, text):
         lines = text.split('\n')
-        csv_sep = sublime.load_settings("SQLExec.sublime-settings").get('csv_separator', ';')
+        csv_sep = sqlexec_settings.get('csv_separator', ';')
         tabularData = [];
         for line in lines:
             mat = re.search('((-+)|)(\+)((-+)|)',line)
@@ -131,30 +139,32 @@ class Command:
             tableCol = []
             for col in columns:
                 col = col.strip()
-                if col.find(csv_sep) > 0:
-                    col = '"' + col + '"';
+                #if col.find(csv_sep) > 0:
+                col = '"' + col + '"';
                 col = re.sub('/\\\|/',"|",col);
                 tableCol.append(col)
             tabularData.append(csv_sep.join(tableCol))
         return "\n".join(tabularData)
 
     def _display(self, panelName, text, export = False):
-        if not sublime.load_settings("SQLExec.sublime-settings").get('show_result_on_window') and not export:
-            panel = sublime.active_window().create_output_panel(panelName)
-            sublime.active_window().run_command("show_panel",
-                {"panel": "output." + panelName})
-        else:
-            panel = sublime.active_window().new_file()
-
+        panel = self.get_panel(panelName,export)
         panel.set_read_only(False)
-        panel.set_syntax_file('Packages/SQL/SQL.tmLanguage')
+        panel.set_syntax_file(sqlexec_settings.get('syntax'))
+
         text = self._clean_text(text) if export else text
 
-        panel.run_command('append', {'characters': text})
+        panel.settings().add_on_change('color_scheme', sqlexec_settings.get('color_scheme'))
+        panel.settings().set('color_scheme', sqlexec_settings.get('color_scheme'))
+
         if export:
+            panel.run_command('append', {'characters': text})
             panel.set_name(panelName+".csv")
+            panel.set_read_only(True)
             panel.run_command('save')
-        panel.set_read_only(True)
+        else:
+            panel.run_command('append', {'characters': self.fill_template(connection.name, connection.query, text)})
+            panel.set_read_only(sqlexec_settings.get('read_only_results'))
+
 
     def _display_tab(self, text):
         view = sublime.active_window().new_file()
@@ -164,10 +174,26 @@ class Command:
         view.set_scratch(True)
 
     def _result(self, text, export = False):
-        self._display('SQLExec', text, export)
+        self._display('SQLExec Results', text, export)
 
     def _errors(self, text):
         self._display('SQLExec.errors', text)
+
+    def fill_template(self, connection_name, query, result):
+        return self.template.substitute(dbinfo=connection_name, qtime=datetime.now(),
+                                        query=re.sub(r'\s+', ' ', query.replace('\n', ' ')),
+                                        result=result)
+
+    def get_panel(self, panel_name=None, export = False):
+        if self.show_result_on_window or export:
+            panel = sublime.active_window().new_file()
+            if panel_name:
+                panel.set_name(panel_name)
+            panel.set_scratch(True)
+            return panel
+        panel = sublime.active_window().create_output_panel(panel_name)
+        sublime.active_window().run_command("show_panel", {"panel": "output." + panel_name})
+        return panel
 
     def run(self):
         sublime.status_message(' SQLExec: running SQL command')
@@ -181,8 +207,11 @@ class Command:
 
         return results.decode(encoding, 'replace').replace('\r', '')
 
-    def show(self, export = False):
-        results = self.run()
+    def show(self, export = False, results=None):
+        if results is None:
+           results = self.run()
+        else:
+            self._display("SQLExec Results", results)
 
         if results:
             self._result(results, export)
@@ -204,60 +233,154 @@ class Selection:
 
 class Options:
     def __init__(self, name):
-        self.name     = name
-        connections   = sublime.load_settings("SQLExec.sublime-settings").get(
-            'connections')
-        self.type     = connections[self.name]['type']
-        self.host     = connections[self.name]['host']
-        self.port     = connections[self.name]['port']
+        self.name = name
+        connections = sqlexec_settings.get('connections')
+        self.type = connections[self.name]['type']
+        self.host = connections[self.name]['host']
+        self.port = connections[self.name]['port']
         self.username = connections[self.name]['username']
         if 'password' in connections[self.name]:
             self.password = connections[self.name]['password']
         self.database = connections[self.name]['database']
         self.encoding = connections[self.name].get('encoding')
         if 'service' in connections[self.name]:
-            self.service  = connections[self.name]['service']
+            self.service = connections[self.name]['service']
 
     def __str__(self):
         return self.name
 
     @staticmethod
     def list():
-        names = []
-        connections = sublime.load_settings("SQLExec.sublime-settings").get(
-            'connections')
-        for connection in connections:
-            names.append(connection)
-        names.sort()
-        return names
+        try:
+            return sorted([conn for conn in sqlexec_settings.get('connections')])
+        except:
+            return []
+
+
+class SQLite(object):
+
+    result_template = Template('Table: $table\n$data\n\nRaw:\n$raw')
+
+    def __init__(self, table_name=None, result=None, table_meta=None):
+        self.table_name = table_name
+        self.result = result
+        self.table_meta = table_meta
+
+    def _prepare_desc_result(self):
+        self.table_name = self.table_name.strip()
+        self.raw_data = self.result
+        self.table_meta = self.result.split('\n')
+        self.table_desc = self.table_meta.pop(0)
+
+    def _prepare_desc_indexes(self):
+        self.indexes = list()
+        for index in self.table_meta:
+            i = self.parse_index(index)
+            if i:
+                self.indexes.append(i)
+
+    def get_cell_len(self, data, key):
+        """ data is a list of dicts and key is a string """
+        vals = [str(i[key]) for i in data]
+        vals.append(key)
+        return len(max([i for i in vals], key=len))
+
+    def parse_results(self, result_list):
+        result_list = [i for i in result_list if i != '']
+
+    def get_table_desc(self):
+        self._prepare_desc_result()
+        self._prepare_desc_indexes()
+        self.data = self.format_table_desc()
+        return self.result_template.substitute(table=self.table_name, data=self.data, raw=self.raw_data)
+
+    def format_table_desc(self):
+        self.table_desc = self.table_desc.strip()
+        self.table_desc = re.sub(r'CREATE TABLE "{}" \('.format(self.table_name), '', self.table_desc)
+        self.table_desc = re.sub(r'\)\;$', '', self.table_desc)
+        self.table_desc = self.table_desc.replace('"', '')
+
+        rows = list()
+        uniq = list()
+        m = re.match(r".*UNIQUE\s\((.*)\)", self.table_desc)
+        if m:
+            try:
+                uniq = m.group(1)
+                uniq = uniq.split(',')
+                self.table_desc = re.sub(r"\, UNIQUE\s\(.*\)", '', self.table_desc)
+            except:
+                uniq = list()
+
+        parselist = self.table_desc.split(',')
+        parselist = [p.strip() for p in parselist]
+
+        for row in parselist:
+            fields = dict()
+            row = row.split(' ', 2)
+
+            fields['NAME'] = row.pop(0)
+            fields['TYPE'] = row.pop(0)
+            fields['INDEX'] = '' if fields['NAME'] not in self.indexes else 'X'
+            fields['UNIQUE'] = '' if fields['NAME'] not in uniq else 'X'
+            fields['ATTRIBUTES'] = ' '.join(row)
+            rows.append(fields)
+
+        name_len = self.get_cell_len(rows, 'NAME')
+        type_len = self.get_cell_len(rows, 'TYPE')
+        index_len = self.get_cell_len(rows, 'INDEX')
+        unique_len = self.get_cell_len(rows, 'UNIQUE')
+        attr_len = self.get_cell_len(rows, 'ATTRIBUTES')
+
+        header_formatter = '| {:^%s} | {:^%s} | {:^%s} | {:^%s} | {:^%s} |' % (name_len, type_len, index_len, unique_len, attr_len)
+        data_formatter = '| {:<%s} | {:<%s} | {:^%s} | {:^%s} | {:<%s} |' % (name_len, type_len, index_len, unique_len, attr_len)
+        the_table_tr_border = '+-{}-+-{}-+-{}-+-{}-+-{}-+'.format('-'*name_len, '-'*type_len, '-'*index_len, '-'*unique_len, '-'*attr_len)
+
+        the_table = '{}\n{}\n{}\n'.format(the_table_tr_border,
+                                          header_formatter.format('NAME', 'TYPE', 'INDEX', 'UNIQUE', 'ATTRIBUTES'),
+                                          the_table_tr_border)
+        for row in rows:
+            the_table = '{}{}\n'.format(the_table,
+                                        data_formatter.format(row['NAME'], row['TYPE'], row['INDEX'], row['UNIQUE'], row['ATTRIBUTES']))
+        return '{}{}'.format(the_table, the_table_tr_border)
+
+    def parse_index(self, table_meta):
+        m = re.match(r"^CREATE\sINDEX \"\w+\"\sON\s\"\w+\"\s\(\"(\w+)\"\);", table_meta)
+        try:
+            return m.group(1)
+        except:
+            pass
+        return None
+
 
 
 def sqlChangeConnection(index):
     global connection
     names = Options.list()
-    options = Options(names[index])
-    connection = Connection(options)
-    sublime.status_message(' SQLExec: switched to %s' % names[index])
-    sublime.active_window().active_view().run_command('sql_show_active_connection')
-
+    try:
+        options = Options(names[index])
+        connection = Connection(options)
+        sublime.status_message(' SQLExec: switched to %s' % names[index])
+        sublime.active_window().active_view().run_command('sql_show_active_connection')
+    except IndexError:
+        sublime.status_message(' SQLExec Error: %s is not configured in SQLExec settings' % index)
 
 
 def showTableRecords(index):
     if index > -1:
-        if connection is not None:
-            tables = connection.desc()
-            connection.showTableRecords(tables[index])
-        else:
-            sublime.error_message('No active connection')
+        if connection is None:
+            return sublime.error_message('No active connection')
+        tables = connection.desc()
+        connection.showTableRecords(tables[index])
+
 
 
 def descTable(index):
     if index > -1:
-        if connection is not None:
-            tables = connection.desc()
-            connection.descTable(tables[index])
-        else:
-            sublime.error_message('No active connection')
+        if connection is None:
+            return sublime.error_message('No active connection')
+        tables = connection.desc()
+        connection.descTable(tables[index])
+
 
 
 def descFunc(index):
@@ -363,7 +486,7 @@ class sqlShowActiveConnection(sublime_plugin.TextCommand):
 
     def status_bar(self):
         global connection
-        icon = sublime.load_settings("SQLExec.sublime-settings").get('connection_icon') or '\u26A1'
+        icon = sqlexec_settings.get('connection_icon') or '\u26A1'
 
         message =  'SQLExec conn %s : %s ' % (icon, connection.options)
         sublime.active_window().active_view().set_status('sqlexec', message)

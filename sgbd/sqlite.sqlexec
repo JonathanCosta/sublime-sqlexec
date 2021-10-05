@@ -1,0 +1,26 @@
+{
+    "sql_exec": {
+        "options": [],
+        "before": [
+            ".timer on"
+        ],
+        "args": "{options.database}",
+        "queries": {
+            "desc" : {
+                "query": ".tables",
+                "options": [],
+                "format" : "|%s|"
+            },
+            "desc table": {
+                "query": ".schema %s",
+                "options": [],
+                "format" : "|%s|"
+            },
+            "show records": {
+                "query": "select * from %s;",
+                "options": [],
+                "format" : "|%s|"
+            }
+        }
+    }
+}

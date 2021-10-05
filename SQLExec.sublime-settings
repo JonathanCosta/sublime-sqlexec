@@ -5,8 +5,13 @@
         "pgsql"  : "psql",
         "oracle" : "sqlplus",
         "vertica": "vsql",
+        "sqlite": "sqlite3"
     },
     "connections": {
     },
     "csv_separator": ";",
+    "connection_icon":"\u26A1",
+    "syntax": "Packages/SQLExec/SQLExecResults.tmLanguage",
+    "color_scheme": "Packages/SQLExec/SQLExecResults.tmTheme",
+    "read_only_results": true
 }
