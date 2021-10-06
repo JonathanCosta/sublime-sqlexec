@@ -4,9 +4,9 @@ from datetime import datetime
 from string import Template
 
 connection = None
+sqlexec_settings = sublime.load_settings("SQLExec.sublime-settings")
 debug = sqlexec_settings.get('sql_exec.debug')
 history = ['']
-sqlexec_settings = sublime.load_settings("SQLExec.sublime-settings")
 class Connection:
     def __init__(self, options):
         self.query = ''
